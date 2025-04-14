@@ -1,0 +1,30 @@
+# Dependency directories
+node_modules/
+venv/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Test databases (if applicable)
+/backend/test.db
+/backend/test_db/
+
+# IDE files (optional, add based on your IDE)
+.vscode/
+.idea/ 
