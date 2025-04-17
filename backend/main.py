@@ -10,6 +10,9 @@ from app.scrapers.scraper_manager import scraper_manager
 from app.core.cache import redis_cache
 from app.api.endpoints import hanja
 
+# 앱 임포트 (현재 디렉토리의 app.py 파일에서 app 변수 임포트)
+from app import app
+
 app = FastAPI(title="한자 사전 API")
 
 # CORS 설정
@@ -22,7 +25,7 @@ app.add_middleware(
 )
 
 # API 라우터 등록
-app.include_router(hanja.router, prefix="/api/v1/hanja", tags=["hanja"])
+app.include_router(hanja.router, prefix="/hanja", tags=["hanja"])
 
 @app.get("/")
 async def root():
@@ -38,4 +41,4 @@ async def clear_cache():
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True) 

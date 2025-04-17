@@ -1,0 +1,50 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<channel>
+	<title>?ъ쟾 寃??/title>
+	<link>https:stdict.korean.go.kr</link>
+	<description>?ъ쟾 寃??寃곌낵</description>
+	<lastBuildDate>20250405 01:04:30</lastBuildDate>
+	<total>436134</total>
+	<item>
+		<target_code>382741</target_code>
+		<word_info>
+			<word><![CDATA[媛01]]></word>
+			<word_unit>?⑥뼱</word_unit>
+			<word_type>怨좎쑀??/word_type>
+			<pronunciation_info>
+				<pronunciation><![CDATA[媛?]]></pronunciation>
+			</pronunciation_info>
+			<origin><![CDATA[竊쒘넦竊쒘녉竊쒖슜媛竊?]></origin>
+			<pos_info>
+				<pos_code>382741001</pos_code>
+				<pos>紐낆궗</pos>
+				<comm_pattern_info>
+					<comm_pattern_code>382741001001</comm_pattern_code>
+					<sense_info>
+						<sense_code>551436</sense_code>
+						<type>?쇰컲??/type>
+						<definition><![CDATA[寃쎄퀎??媛源뚯슫 諛붽묑履?遺遺?]]></definition>
+						<definition_original><![CDATA[寃쎄퀎??媛源뚯슫 諛붽묑履?遺遺?]]></definition_original>
+					</sense_info>
+					<sense_info>
+						<sense_code>554593</sense_code>
+						<type>?쇰컲??/type>
+						<definition><![CDATA[?대뼡 以묒떖 ?섎뒗 怨녹뿉??媛源뚯슫 遺遺?]]></definition>
+						<definition_original><![CDATA[?대뼡 以묒떖 ?섎뒗 怨녹뿉??媛源뚯슫 遺遺?]]></definition_original>
+					</sense_info>
+					<sense_info>
+						<sense_code>558115</sense_code>
+						<type>?쇰컲??/type>
+						<definition><![CDATA[洹몃쫯 ?곗쐞???꾧?由ъ쓽 二쇰?.]]></definition>
+						<definition_original><![CDATA[洹몃쫯 ?곗쐞???꾧?由ъ쓽 二쇰?.]]></definition_original>
+						<example_info>
+							<example><![CDATA[李멸린由꾩쓣 ?곕? ??媛???섎━吏 ?딅룄濡?議곗떖?대씪.]]></example>
+						</example_info>
+					</sense_info>
+					<sense_info>
+						<sense_code>558844</sense_code>
+						<type>?쇰컲??/type>
+						<definition><![CDATA[?섏＜蹂?숈쓽 ?살쓣 ?섑??대뒗 留?]]></definition>
+						<definition_original><![CDATA[?섏＜蹂?숈쓽 ?살쓣 ?섑??대뒗 留?]]></definition_original>
+						<sense_grammar_info>
+							<grammar><![CDATA[?쇰? 紐낆궗 ?ㅼ뿉 遺숈뼱]]></grammar>

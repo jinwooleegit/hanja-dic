@@ -20,7 +20,7 @@ class Settings(BaseSettings):
             return "sqlite:///:memory:"
         return os.getenv(
             "DATABASE_URL",
-            f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}/{self.POSTGRES_DB}"
+            "sqlite:///./app.db"  # 기본값을 SQLite로 변경
         )
 
     # Redis 설정

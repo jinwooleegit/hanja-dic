@@ -67,26 +67,27 @@ class HanjaResponse(HanjaBase):
 class HanjaSearchRequest(BaseModel):
     """한자 검색 요청 스키마"""
     query: str = Field(..., min_length=1, max_length=50, description="검색어")
+    sort_by: Optional[str] = Field("frequency", description="정렬 기준 (frequency, strokes)")
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "query": "수"
+                "query": "수",
+                "sort_by": "frequency"
             }
         }
     )
 
 class HanjaListResponse(BaseModel):
-    """페이지네이션된 한자 목록 응답"""
-    items: List[HanjaResponse]
-    total: int
-    page: int
-    page_size: int
+    """한자 목록 응답"""
+    total: int = Field(..., description="총 항목 수")
+    hanja_list: List[HanjaResponse] = Field(..., description="한자 목록")
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "items": [
+                "total": 1,
+                "hanja_list": [
                     {
                         "traditional": "水",
                         "simplified": "水",
@@ -101,10 +102,7 @@ class HanjaListResponse(BaseModel):
                         "created_at": "2023-06-01T12:00:00",
                         "updated_at": "2023-06-01T12:00:00"
                     }
-                ],
-                "total": 1,
-                "page": 1,
-                "page_size": 20
+                ]
             }
         }
     ) 

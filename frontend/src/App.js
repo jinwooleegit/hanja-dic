@@ -9,6 +9,7 @@ import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
 import SearchResultPage from './pages/SearchResultPage';
 import HanjaDetailPage from './pages/HanjaDetailPage';
+import FavoritesPage from './pages/FavoritesPage';
 import AboutPage from './pages/AboutPage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -77,6 +78,7 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/search" element={<SearchResultPage />} />
               <Route path="/hanja/:id" element={<HanjaDetailPage />} />
+              <Route path="/favorites" element={<FavoritesPage />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios'; // axios 임포트
 import {
   Container,
   Typography,
@@ -31,54 +32,10 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import SaveAltIcon from '@mui/icons-material/SaveAlt';
 import ShareIcon from '@mui/icons-material/Share';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 
-// 상세 한자 정보 (실제로는 API 호출로 데이터를 가져옴)
-const MOCK_HANJA_DETAIL = {
-  id: 1,
-  traditional: '愛',
-  simplified: '爱',
-  pronunciation: {
-    korean: '애',
-    chinese: {
-      pinyin: 'ài',
-      cantonese: 'oi3'
-    },
-    japanese: 'ai',
-  },
-  meaning: '사랑 애',
-  meanings: [
-    '사랑하다',
-    '좋아하다',
-    '귀여워하다',
-    '아끼다',
-    '친애하다'
-  ],
-  radical: '心',
-  radicalMeaning: '마음 심',
-  strokes: 13,
-  level: '초등학교 5학년',
-  frequency: 98,
-  examples: [
-    { hanja: '愛情', hangul: '애정', meaning: '사랑하는 마음' },
-    { hanja: '戀愛', hangul: '연애', meaning: '남녀 간의 사랑' },
-    { hanja: '博愛', hangul: '박애', meaning: '널리 사랑함' },
-    { hanja: '慈愛', hangul: '자애', meaning: '사랑과 자비' },
-    { hanja: '親愛', hangul: '친애', meaning: '친하고 사랑함' }
-  ],
-  compounds: [
-    { id: 101, hanja: '愛國', pronunciation: '애국', meaning: '나라를 사랑함' },
-    { id: 102, hanja: '愛好', pronunciation: '애호', meaning: '좋아하고 즐김' },
-    { id: 103, hanja: '愛人', pronunciation: '애인', meaning: '사랑하는 사람' },
-    { id: 104, hanja: '友愛', pronunciation: '우애', meaning: '친구로서 사랑함' },
-    { id: 105, hanja: '自愛', pronunciation: '자애', meaning: '자신을 사랑함' },
-    { id: 106, hanja: '愛護', pronunciation: '애호', meaning: '사랑하고 보호함' }
-  ],
-  history: {
-    origin: '갑골문에서는 사람이 무릎을 꿇고 있는 모습을 나타내었으며, 후에 \'마음(心)\'이 추가되어 정성스러운 마음을 표현하게 되었다.',
-    evolution: ['갑골문', '금문', '전서', '예서', '해서'],
-    similar: ['憐', '恩', '慈']
-  }
-};
+// 백엔드 API 기본 URL
+const API_BASE_URL = 'http://localhost:8000';
 
 const TabPanel = (props) => {
   const { children, value, index, ...other } = props;
@@ -102,53 +59,116 @@ const TabPanel = (props) => {
 
 const HanjaDetailPage = () => {
   const theme = useTheme();
-  const { id } = useParams();
+  const { id: hanjaChar } = useParams(); // URL 파라미터에서 한자 가져오기
   const navigate = useNavigate();
   const [hanjaData, setHanjaData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tabValue, setTabValue] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
-  // 한자 데이터 불러오기 (API 호출 시뮬레이션)
+  // 한자 데이터 불러오기
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    
-    // 실제 구현에서는 API 호출로 변경
-    const timer = setTimeout(() => {
+    const fetchHanjaDetail = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setHanjaData(MOCK_HANJA_DETAIL);
-        setLoading(false);
+        const response = await axios.get(`${API_BASE_URL}/hanja/details/${encodeURIComponent(hanjaChar)}`);
+        setHanjaData(response.data);
+        setIsFavorite(response.data.favorite || false);
       } catch (err) {
-        setError('한자 정보를 불러오는 중 오류가 발생했습니다.');
+        console.error("Hanja Detail API error:", err);
+        if (err.response && err.response.status === 404) {
+          setError('해당 한자 정보를 찾을 수 없습니다.');
+        } else {
+          setError('한자 정보를 불러오는 중 오류가 발생했습니다.');
+        }
+      } finally {
         setLoading(false);
       }
-    }, 800);
+    };
     
-    return () => clearTimeout(timer);
-  }, [id]);
+    fetchHanjaDetail();
+  }, [hanjaChar]); // URL의 한자가 변경될 때마다 실행
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
   
-  // 발음 재생 (실제로는 발음 API와 연동해야 함)
-  const playPronunciation = () => {
-    alert('한자 발음 재생 기능은 준비 중입니다.');
+  // 발음 재생 (Google Text-to-Speech API 연동)
+  const playPronunciation = (text, language = 'ko-KR') => {
+    setIsPlaying(true);
+    
+    // Text-to-Speech API를 위한 URL 생성
+    // 참고: Google TTS API를 사용하려면 API 키가 필요함
+    // 여기서는 Web Speech API를 사용하는 방법으로 구현
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = language;
+    
+    utterance.onend = () => {
+      setIsPlaying(false);
+    };
+    
+    utterance.onerror = () => {
+      console.error('TTS Error');
+      setIsPlaying(false);
+    };
+    
+    window.speechSynthesis.speak(utterance);
+  };
+  
+  // 한국어 발음 재생
+  const playKoreanPronunciation = () => {
+    if (!hanjaData || !hanjaData.korean_pronunciation) return;
+    playPronunciation(hanjaData.korean_pronunciation, 'ko-KR');
+  };
+  
+  // 중국어 발음 재생
+  const playChinesePronunciation = () => {
+    if (!hanjaData || !hanjaData.chinese_pronunciation) return;
+    playPronunciation(hanjaData.chinese_pronunciation, 'zh-CN');
+  };
+  
+  // 일본어 발음 재생
+  const playJapanesePronunciation = () => {
+    if (!hanjaData || !hanjaData.japanese_pronunciation) return;
+    playPronunciation(hanjaData.japanese_pronunciation, 'ja-JP');
   };
   
   // 공유하기
   const shareHanja = () => {
-    if (navigator.share) {
+    if (navigator.share && hanjaData) {
       navigator.share({
         title: `한자 사전 - ${hanjaData.traditional}`,
-        text: `${hanjaData.traditional} (${hanjaData.pronunciation.korean}) - ${hanjaData.meaning}`,
+        text: `${hanjaData.traditional} (${hanjaData.korean_pronunciation || '-'}) - ${hanjaData.meaning || '-'}`,
         url: window.location.href,
       });
     } else {
       navigator.clipboard.writeText(window.location.href)
         .then(() => alert('링크가 클립보드에 복사되었습니다.'))
         .catch(() => alert('링크 복사에 실패했습니다.'));
+    }
+  };
+
+  // 즐겨찾기 토글
+  const toggleFavorite = async () => {
+    if (!hanjaData) return;
+    
+    setFavoriteLoading(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/hanja/favorite/${encodeURIComponent(hanjaChar)}`);
+      setIsFavorite(response.data.favorite);
+      // 토스트 메시지 표시 (선택사항)
+      const message = response.data.favorite ? '즐겨찾기에 추가되었습니다.' : '즐겨찾기에서 제거되었습니다.';
+      alert(message); // 실제 구현시 토스트 컴포넌트로 대체
+    } catch (err) {
+      console.error("Favorite toggle error:", err);
+      alert('즐겨찾기 상태 변경 중 오류가 발생했습니다.');
+    } finally {
+      setFavoriteLoading(false);
     }
   };
 
@@ -181,6 +201,14 @@ const HanjaDetailPage = () => {
     );
   }
 
+  // 데이터 구조 접근 시 null 체크 추가
+  const pronunciation = hanjaData.pronunciation || {};
+  const chinesePronunciation = pronunciation.chinese || {};
+  const history = hanjaData.history || {};
+  const examples = hanjaData.examples || [];
+  const compounds = hanjaData.compounds || [];
+  const meanings = hanjaData.meanings || [hanjaData.meaning]; // 기본 뜻을 배열로 처리
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Button
@@ -209,39 +237,78 @@ const HanjaDetailPage = () => {
               </Typography>
               
               <Box>
-                {hanjaData.traditional !== hanjaData.simplified && (
+                {hanjaData.traditional !== hanjaData.simplified && hanjaData.simplified && (
                   <Chip 
-                    label={`간체자: ${hanjaData.simplified}`} 
-                    size="small" 
+                    label={`간체자: ${hanjaData.simplified}`}
+                    size="small"
                     sx={{ mb: 1 }}
                   />
                 )}
                 <Chip 
-                  label={`${hanjaData.strokes}획`} 
+                  label={`${hanjaData.stroke_count || '-'}획`} 
                   color="primary"
-                  size="small" 
+                  size="small"
                 />
               </Box>
             </Box>
             
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
               <Typography variant="h4" component="div">
-                {hanjaData.pronunciation.korean}
+                {hanjaData.korean_pronunciation || '-'}
               </Typography>
-              <IconButton size="small" onClick={playPronunciation} sx={{ ml: 1 }}>
-                <VolumeUpIcon fontSize="small" />
+              <IconButton 
+                size="small" 
+                onClick={playKoreanPronunciation} 
+                sx={{ ml: 1 }}
+                disabled={isPlaying || !hanjaData.korean_pronunciation}
+              >
+                <VolumeUpIcon fontSize="small" color={isPlaying ? "primary" : "action"} />
               </IconButton>
             </Box>
             
+            {/* 중국어 발음 */}
+            {hanjaData.chinese_pronunciation && (
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                <Typography variant="body1" color="text.secondary">
+                  중국어: {hanjaData.chinese_pronunciation}
+                </Typography>
+                <IconButton 
+                  size="small" 
+                  onClick={playChinesePronunciation} 
+                  sx={{ ml: 1 }}
+                  disabled={isPlaying}
+                >
+                  <VolumeUpIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            )}
+            
+            {/* 일본어 발음 */}
+            {hanjaData.japanese_pronunciation && (
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                <Typography variant="body1" color="text.secondary">
+                  일본어: {hanjaData.japanese_pronunciation}
+                </Typography>
+                <IconButton 
+                  size="small" 
+                  onClick={playJapanesePronunciation} 
+                  sx={{ ml: 1 }}
+                  disabled={isPlaying}
+                >
+                  <VolumeUpIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            )}
+            
             <Typography variant="h6" color="text.secondary" gutterBottom>
-              {hanjaData.meaning}
+              {hanjaData.meaning || '-'}
             </Typography>
             
             <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
-              {hanjaData.meanings.map((meaning, index) => (
+              {meanings.map((meaning, index) => (
                 <Chip 
                   key={index}
-                  label={meaning} 
+                  label={meaning}
                   color="secondary"
                   variant="outlined"
                   size="small"
@@ -251,11 +318,18 @@ const HanjaDetailPage = () => {
           </Grid>
           
           <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
-              <ButtonGroup variant="outlined" size="small" sx={{ mb: 2 }}>
-                <Button startIcon={<SaveAltIcon />}>저장</Button>
-                <Button startIcon={<ShareIcon />} onClick={shareHanja}>공유</Button>
-                <Button startIcon={<FavoriteBorderIcon />}>즐겨찾기</Button>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+              <ButtonGroup variant="outlined" aria-label="한자 기능">
+                <Button 
+                  startIcon={isFavorite ? <FavoriteIcon color="error" /> : <FavoriteBorderIcon />}
+                  onClick={toggleFavorite}
+                  disabled={favoriteLoading}
+                >
+                  {isFavorite ? '즐겨찾기 됨' : '즐겨찾기'}
+                </Button>
+                <Button startIcon={<ShareIcon />} onClick={shareHanja}>
+                  공유하기
+                </Button>
               </ButtonGroup>
             </Box>
             
@@ -267,10 +341,10 @@ const HanjaDetailPage = () => {
                   </Typography>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="h5">
-                      {hanjaData.radical}
+                      {hanjaData.radical || '-'}
                     </Typography>
                     <Typography color="text.secondary">
-                      {hanjaData.radicalMeaning}
+                      {history.radicalMeaning || '-'}
                     </Typography>
                   </Box>
                 </Paper>
@@ -282,7 +356,7 @@ const HanjaDetailPage = () => {
                     급수
                   </Typography>
                   <Typography variant="h5">
-                    {hanjaData.level}
+                    {hanjaData.level || '-'}
                   </Typography>
                 </Paper>
               </Grid>
@@ -298,7 +372,7 @@ const HanjaDetailPage = () => {
                         중국어(병음)
                       </Typography>
                       <Typography>
-                        {hanjaData.pronunciation.chinese.pinyin}
+                        {chinesePronunciation.pinyin || '-'}
                       </Typography>
                     </Box>
                     <Divider orientation="vertical" flexItem />
@@ -307,7 +381,7 @@ const HanjaDetailPage = () => {
                         중국어(광동어)
                       </Typography>
                       <Typography>
-                        {hanjaData.pronunciation.chinese.cantonese}
+                        {chinesePronunciation.cantonese || '-'}
                       </Typography>
                     </Box>
                     <Divider orientation="vertical" flexItem />
@@ -316,7 +390,7 @@ const HanjaDetailPage = () => {
                         일본어
                       </Typography>
                       <Typography>
-                        {hanjaData.pronunciation.japanese}
+                        {pronunciation.japanese || '-'}
                       </Typography>
                     </Box>
                   </Box>
@@ -349,37 +423,41 @@ const HanjaDetailPage = () => {
         <Typography variant="h6" gutterBottom>
           관련 단어
         </Typography>
-        <Grid container spacing={2}>
-          {hanjaData.compounds.map((compound) => (
-            <Grid item key={compound.id} xs={12} sm={6} md={4}>
-              <Card 
-                variant="outlined"
-                sx={{ 
-                  height: '100%', 
-                  transition: 'transform 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 2,
-                  }
-                }}
-              >
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="h6">
-                      {compound.hanja}
+        {compounds.length > 0 ? (
+          <Grid container spacing={2}>
+            {compounds.map((compound) => (
+              <Grid item key={compound.id || compound.hanja} xs={12} sm={6} md={4}>
+                <Card 
+                  variant="outlined"
+                  sx={{ 
+                    height: '100%', 
+                    transition: 'transform 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 2,
+                    }
+                  }}
+                >
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Typography variant="h6">
+                        {compound.hanja}
+                      </Typography>
+                      <Typography variant="body1" color="text.secondary">
+                        {compound.pronunciation}
+                      </Typography>
+                    </Box>
+                    <Typography color="text.secondary">
+                      {compound.meaning}
                     </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                      {compound.pronunciation}
-                    </Typography>
-                  </Box>
-                  <Typography color="text.secondary">
-                    {compound.meaning}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        ) : (
+          <Typography color="text.secondary">관련 단어 정보가 없습니다.</Typography>
+        )}
       </TabPanel>
       
       {/* 상세정보 탭 패널 */}
@@ -392,49 +470,49 @@ const HanjaDetailPage = () => {
             <ListItem>
               <ListItemText 
                 primary="한자" 
-                secondary={`${hanjaData.traditional}${hanjaData.traditional !== hanjaData.simplified ? ' (간체자: ' + hanjaData.simplified + ')' : ''}`}
+                secondary={`${hanjaData.traditional}${hanjaData.simplified && hanjaData.traditional !== hanjaData.simplified ? ' (간체자: ' + hanjaData.simplified + ')' : ''}`}
               />
             </ListItem>
             <Divider component="li" />
             <ListItem>
               <ListItemText 
                 primary="독음" 
-                secondary={hanjaData.pronunciation.korean}
+                secondary={hanjaData.korean_pronunciation || '-'}
               />
             </ListItem>
             <Divider component="li" />
             <ListItem>
               <ListItemText 
                 primary="뜻" 
-                secondary={hanjaData.meaning}
+                secondary={hanjaData.meaning || '-'}
               />
             </ListItem>
             <Divider component="li" />
             <ListItem>
               <ListItemText 
                 primary="부수" 
-                secondary={`${hanjaData.radical} (${hanjaData.radicalMeaning})`}
+                secondary={`${hanjaData.radical || '-'} (${history.radicalMeaning || '-'})`}
               />
             </ListItem>
             <Divider component="li" />
             <ListItem>
               <ListItemText 
                 primary="획수" 
-                secondary={hanjaData.strokes}
+                secondary={hanjaData.stroke_count || '-'}
               />
             </ListItem>
             <Divider component="li" />
             <ListItem>
               <ListItemText 
                 primary="급수" 
-                secondary={hanjaData.level}
+                secondary={hanjaData.level || '-'}
               />
             </ListItem>
             <Divider component="li" />
             <ListItem>
               <ListItemText 
                 primary="빈도" 
-                secondary={`${hanjaData.frequency}% (자주 사용됨)`}
+                secondary={`${hanjaData.frequency !== undefined ? hanjaData.frequency + '%' : '-'} ${hanjaData.frequency !== undefined ? '(자주 사용됨)' : ''}`}
               />
             </ListItem>
           </List>
@@ -446,33 +524,37 @@ const HanjaDetailPage = () => {
         <Typography variant="h6" gutterBottom>
           예문
         </Typography>
-        <List>
-          {hanjaData.examples.map((example, index) => (
-            <React.Fragment key={index}>
-              <ListItem>
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Typography variant="h6" component="span">
-                        {example.hanja}
-                      </Typography>
-                      <Typography 
-                        variant="body1" 
-                        component="span" 
-                        color="text.secondary"
-                        sx={{ ml: 2 }}
-                      >
-                        {example.hangul}
-                      </Typography>
-                    </Box>
-                  }
-                  secondary={example.meaning}
-                />
-              </ListItem>
-              {index < hanjaData.examples.length - 1 && <Divider component="li" />}
-            </React.Fragment>
-          ))}
-        </List>
+        {examples.length > 0 ? (
+          <List>
+            {examples.map((example, index) => (
+              <React.Fragment key={index}>
+                <ListItem>
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Typography variant="h6" component="span">
+                          {example.hanja}
+                        </Typography>
+                        <Typography 
+                          variant="body1" 
+                          component="span" 
+                          color="text.secondary"
+                          sx={{ ml: 2 }}
+                        >
+                          {example.hangul}
+                        </Typography>
+                      </Box>
+                    }
+                    secondary={example.meaning}
+                  />
+                </ListItem>
+                {index < examples.length - 1 && <Divider component="li" />}
+              </React.Fragment>
+            ))}
+          </List>
+        ) : (
+          <Typography color="text.secondary">예문 정보가 없습니다.</Typography>
+        )}
       </TabPanel>
       
       {/* 어원 탭 패널 */}
@@ -482,28 +564,35 @@ const HanjaDetailPage = () => {
         </Typography>
         <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, mb: 3 }}>
           <Typography variant="body1" paragraph>
-            {hanjaData.history.origin}
+            {history.origin || '어원 정보가 없습니다.'}
           </Typography>
           
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
-            {hanjaData.history.evolution.map((stage, index) => (
-              <Chip key={index} label={stage} variant="outlined" />
-            ))}
-          </Box>
+          {history.evolution && history.evolution.length > 0 && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+              {history.evolution.map((stage, index) => (
+                <Chip key={index} label={stage} variant="outlined" />
+              ))}
+            </Box>
+          )}
           
-          <Typography variant="subtitle1" gutterBottom>
-            유사 한자
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            {hanjaData.history.similar.map((char, index) => (
-              <Chip 
-                key={index} 
-                label={char} 
-                color="primary"
-                onClick={() => navigate(`/hanja/${char}`)}
-              />
-            ))}
-          </Box>
+          {history.similar && history.similar.length > 0 && (
+            <>
+              <Typography variant="subtitle1" gutterBottom>
+                유사 한자
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                {history.similar.map((char, index) => (
+                  <Chip 
+                    key={index} 
+                    label={char} 
+                    color="primary"
+                    onClick={() => navigate(`/hanja/${char}`)}
+                    clickable
+                  />
+                ))}
+              </Box>
+            </>
+          )}
         </Paper>
       </TabPanel>
     </Container>

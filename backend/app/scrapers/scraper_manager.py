@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class ScraperManager:
     def __init__(self):
-        self.scrapers: List[BaseScraper] = [
+        self.scrapers = [
             NaverScraper(),
             DaumScraper(),
             NationalScraper()
@@ -25,7 +25,7 @@ class ScraperManager:
         try:
             loop = asyncio.get_event_loop()
             tasks = [
-                loop.run_in_executor(self.executor, self._run_scraper, scraper, query)
+                loop.run_in_executor(self.executor, scraper.search, query)
                 for scraper in self.scrapers
             ]
             
@@ -36,8 +36,11 @@ class ScraperManager:
             for result in results:
                 if isinstance(result, dict) and 'traditional' in result:
                     valid_results.append(result)
+                elif isinstance(result, Exception):
+                    logger.error(f"스크레이퍼 실행 중 오류: {str(result)}")
             
             if not valid_results:
+                logger.warning(f"'{query}'에 대한 유효한 검색 결과 없음")
                 return {}
                 
             # 결과 병합 및 정제
@@ -49,13 +52,48 @@ class ScraperManager:
                 logger.error(f"데이터 검증 실패: {validation_errors}")
                 return {}
                 
+            logger.info(f"'{query}'에 대한 검색 결과 병합 완료: {merged_data.get('traditional')}")
             return merged_data
             
         except Exception as e:
             logger.error(f"한자 검색 중 오류 발생: {str(e)}")
             return {}
+    
+    async def search_hanja_async(self, query: str) -> Dict:
+        """여러 스크레이퍼를 비동기적으로 실행하여 한자 검색 결과를 수집합니다."""
+        try:
+            tasks = [scraper.search_hanja_async(query) for scraper in self.scrapers]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
             
-    def _run_scraper(self, scraper: BaseScraper, query: str) -> Dict:
+            # 유효한 결과만 필터링
+            valid_results = []
+            for result in results:
+                if isinstance(result, dict) and 'traditional' in result:
+                    valid_results.append(result)
+                elif isinstance(result, Exception):
+                    logger.error(f"비동기 스크레이퍼 실행 중 오류: {str(result)}")
+            
+            if not valid_results:
+                logger.warning(f"'{query}'에 대한 유효한 비동기 검색 결과 없음")
+                return {}
+                
+            # 결과 병합 및 정제
+            merged_data = HanjaCleaner.merge_hanja_data(valid_results)
+            
+            # 데이터 검증
+            validation_errors = HanjaValidator.validate_hanja_data(merged_data)
+            if validation_errors:
+                logger.error(f"비동기 데이터 검증 실패: {validation_errors}")
+                return {}
+                
+            logger.info(f"'{query}'에 대한 비동기 검색 결과 병합 완료: {merged_data.get('traditional')}")
+            return merged_data
+            
+        except Exception as e:
+            logger.error(f"비동기 한자 검색 중 오류 발생: {str(e)}")
+            return {}
+            
+    def _run_scraper(self, scraper, query: str) -> Dict:
         """개별 스크레이퍼를 실행하고 결과를 반환합니다."""
         try:
             return scraper.search(query)

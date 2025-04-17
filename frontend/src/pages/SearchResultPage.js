@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
+import axios from 'axios'; // axios 임포트
 import {
   Container,
   Typography,
@@ -21,28 +22,32 @@ import {
   Select,
   MenuItem,
   useTheme,
-  Alert
+  Alert,
+  Skeleton
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import SortIcon from '@mui/icons-material/Sort';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
-// 임시 데이터 (실제 구현에서는 API 호출로 대체)
-const MOCK_SEARCH_RESULTS = [
-  { id: 1, traditional: '愛', simplified: '爱', pronunciation: '애', meaning: '사랑 애', frequency: 100, radical: '心', strokes: 13 },
-  { id: 2, traditional: '安', simplified: '安', pronunciation: '안', meaning: '편안할 안', frequency: 95, radical: '宀', strokes: 6 },
-  { id: 3, traditional: '暗', simplified: '暗', pronunciation: '암', meaning: '어두울 암', frequency: 70, radical: '日', strokes: 13 },
-  { id: 4, traditional: '案', simplified: '案', pronunciation: '안', meaning: '책상 안', frequency: 85, radical: '木', strokes: 10 },
-  { id: 5, traditional: '岸', simplified: '岸', pronunciation: '안', meaning: '언덕 안', frequency: 65, radical: '山', strokes: 8 },
-  { id: 6, traditional: '按', simplified: '按', pronunciation: '안', meaning: '누를 안', frequency: 75, radical: '手', strokes: 9 },
-  { id: 7, traditional: '雁', simplified: '雁', pronunciation: '안', meaning: '기러기 안', frequency: 45, radical: '隹', strokes: 12 },
-  { id: 8, traditional: '顔', simplified: '颜', pronunciation: '안', meaning: '얼굴 안', frequency: 80, radical: '頁', strokes: 18 },
-  { id: 9, traditional: '闇', simplified: '暗', pronunciation: '암', meaning: '어두울 암', frequency: 30, radical: '門', strokes: 17 },
-  { id: 10, traditional: '杏', simplified: '杏', pronunciation: '행', meaning: '살구 행', frequency: 40, radical: '木', strokes: 7 },
-  { id: 11, traditional: '行', simplified: '行', pronunciation: '행', meaning: '다닐 행', frequency: 95, radical: '行', strokes: 6 },
-  { id: 12, traditional: '幸', simplified: '幸', pronunciation: '행', meaning: '다행 행', frequency: 85, radical: '干', strokes: 8 },
-];
+// 백엔드 API 기본 URL
+const API_BASE_URL = 'http://localhost:8000'; // 환경 변수 등으로 관리하는 것이 좋음
+
+// 로딩 중 스켈레톤 컴포넌트
+const HanjaCardSkeleton = () => {
+  return (
+    <Card sx={{ height: '100%', minHeight: 180 }}>
+      <CardContent>
+        <Skeleton variant="text" width="80%" height={60} />
+        <Skeleton variant="text" width="40%" />
+        <Skeleton variant="text" width="60%" />
+        <Box sx={{ mt: 2 }}>
+          <Skeleton variant="rectangular" width="100%" height={30} />
+        </Box>
+      </CardContent>
+    </Card>
+  );
+};
 
 const SearchResultPage = () => {
   const theme = useTheme();
@@ -56,11 +61,10 @@ const SearchResultPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
-  const [sortBy, setSortBy] = useState('frequency');
+  const [sortBy, setSortBy] = useState('frequency'); // 기본 정렬: 빈도순
   const [filterBy, setFilterBy] = useState('all');
   
   const itemsPerPage = 8;
-  const maxPage = Math.ceil(results.length / itemsPerPage);
   
   // 페이지 변경 시 스크롤을 맨 위로 이동
   useEffect(() => {
@@ -70,75 +74,84 @@ const SearchResultPage = () => {
   // 검색어 변경 시 결과 업데이트
   useEffect(() => {
     if (initialQuery) {
-      handleSearch();
+      handleSearch(initialQuery);
     }
-  }, [initialQuery]);
-  
-  const handleSearch = () => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]); // location.search가 변경될 때마다 실행
+
+  const handleSearch = async (queryToSearch = searchQuery) => {
+    if (!queryToSearch.trim()) return;
+    
     setLoading(true);
     setError(null);
+    setPage(1); // 새 검색 시 페이지 1로 초기화
     
-    // API 호출 시뮬레이션
-    setTimeout(() => {
-      try {
-        // 실제 구현에서는 axios나 fetch를 사용한 API 호출로 대체
-        const filtered = MOCK_SEARCH_RESULTS.filter(item => {
-          const query = searchQuery.toLowerCase();
-          return (
-            item.traditional.includes(query) ||
-            item.simplified.includes(query) ||
-            item.pronunciation.includes(query) ||
-            item.meaning.toLowerCase().includes(query)
-          );
-        });
-        
-        // 정렬
-        const sorted = [...filtered].sort((a, b) => {
-          if (sortBy === 'frequency') return b.frequency - a.frequency;
-          if (sortBy === 'strokes') return a.strokes - b.strokes;
-          return 0;
-        });
-        
-        setResults(sorted);
-        setPage(1);
-        setLoading(false);
-      } catch (err) {
-        setError('검색 중 오류가 발생했습니다. 다시 시도해주세요.');
-        setLoading(false);
+    try {
+      // 백엔드 API 호출
+      const response = await axios.post(`${API_BASE_URL}/hanja/search`, { 
+        query: queryToSearch.trim() 
+      });
+      
+      // 데이터 정렬 (초기 로드 시)
+      const sortedData = sortData(response.data, sortBy);
+      setResults(sortedData);
+
+    } catch (err) {
+      console.error("Search API error:", err);
+      if (err.response && err.response.status === 404) {
+        setError('검색 결과가 없습니다.');
+        setResults([]); // 결과 없음 명시적 처리
+      } else {
+        setError('검색 중 오류가 발생했습니다. 백엔드 서버 상태를 확인해주세요.');
       }
-    }, 800);
+    } finally {
+      setLoading(false);
+    }
   };
   
   const handleSubmit = (e) => {
     e.preventDefault();
-    handleSearch();
-    // URL 업데이트
+    // URL 업데이트하여 useEffect 트리거
     navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
   };
   
-  const handleSortChange = (event) => {
-    setSortBy(event.target.value);
-    
-    // 정렬 적용
-    const sorted = [...results].sort((a, b) => {
-      if (event.target.value === 'frequency') return b.frequency - a.frequency;
-      if (event.target.value === 'strokes') return a.strokes - b.strokes;
+  // 데이터 정렬 함수
+  const sortData = (data, sortKey) => {
+    return [...data].sort((a, b) => {
+      if (sortKey === 'frequency') return (b.frequency || 0) - (a.frequency || 0);
+      if (sortKey === 'strokes') return (a.stroke_count || 0) - (b.stroke_count || 0);
+      // 다른 정렬 기준 추가 가능
       return 0;
     });
-    
-    setResults(sorted);
+  };
+
+  const handleSortChange = (event) => {
+    const newSortBy = event.target.value;
+    setSortBy(newSortBy);
+    const sortedResults = sortData(results, newSortBy);
+    setResults(sortedResults);
   };
   
   const handleFilterChange = (event) => {
     setFilterBy(event.target.value);
-    // 필터링 로직은 향후 구현
+    // TODO: 필터링 로직 구현 (API 재호출 또는 클라이언트 측 필터링)
   };
   
-  // 현재 페이지에 표시할 결과
+  // 현재 페이지에 표시할 결과 계산
+  const maxPage = Math.ceil(results.length / itemsPerPage);
   const currentResults = results.slice(
     (page - 1) * itemsPerPage,
     page * itemsPerPage
   );
+
+  // 로딩 중 스켈레톤 UI 표시
+  const renderSkeletons = () => {
+    return Array(4).fill(0).map((_, index) => (
+      <Grid item xs={12} sm={6} md={3} key={`skeleton-${index}`}>
+        <HanjaCardSkeleton />
+      </Grid>
+    ));
+  };
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -172,8 +185,8 @@ const SearchResultPage = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
             sx={{ flexGrow: 1 }}
           />
-          <IconButton type="submit" aria-label="search">
-            <SearchIcon />
+          <IconButton type="submit" aria-label="search" disabled={loading}>
+            {loading ? <CircularProgress size={24} /> : <SearchIcon />}
           </IconButton>
         </Paper>
         
@@ -213,6 +226,7 @@ const SearchResultPage = () => {
                 onChange={handleFilterChange}
                 label="필터"
                 startAdornment={<FilterListIcon fontSize="small" sx={{ mr: 1 }} />}
+                disabled // 필터 기능은 아직 미구현
               >
                 <MenuItem value="all">전체</MenuItem>
                 <MenuItem value="radical-heart">심방변</MenuItem>
@@ -230,7 +244,7 @@ const SearchResultPage = () => {
         </Box>
       ) : error ? (
         <Alert severity="error" sx={{ mb: 4 }}>{error}</Alert>
-      ) : results.length === 0 ? (
+      ) : results.length === 0 && initialQuery ? (
         <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
           <Typography variant="h6" gutterBottom>
             검색 결과가 없습니다.
@@ -242,8 +256,10 @@ const SearchResultPage = () => {
       ) : (
         <>
           <Grid container spacing={3}>
-            {currentResults.map((result) => (
-              <Grid item key={result.id} xs={12} sm={6} md={3}>
+            {loading ? (
+              renderSkeletons()
+            ) : currentResults.map((result) => (
+              <Grid item key={result.id || result.traditional} xs={12} sm={6} md={3}>
                 <Card 
                   elevation={2}
                   sx={{ 
@@ -269,30 +285,30 @@ const SearchResultPage = () => {
                           {result.traditional}
                         </Typography>
                         <Chip 
-                          label={`${result.strokes}획`} 
+                          label={`${result.stroke_count || '-'}획`} 
                           size="small" 
                           color="primary" 
                           variant="outlined"
                         />
                       </Box>
                       
-                      {result.traditional !== result.simplified && (
+                      {result.simplified && result.traditional !== result.simplified && (
                         <Typography variant="body2" color="text.secondary" gutterBottom>
                           간체자: {result.simplified}
                         </Typography>
                       )}
                       
                       <Typography variant="h6" gutterBottom>
-                        {result.pronunciation}
+                        {result.korean_pronunciation}
                       </Typography>
                       
-                      <Typography color="text.secondary">
+                      <Typography color="text.secondary" noWrap>
                         {result.meaning}
                       </Typography>
                       
                       <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
                         <Chip 
-                          label={`${result.radical}부`} 
+                          label={`${result.radical || '-'}부`} 
                           size="small" 
                           color="secondary"
                           variant="outlined"

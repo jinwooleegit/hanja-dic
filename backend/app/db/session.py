@@ -14,7 +14,7 @@ def get_connection_args():
     if "sqlite" in settings.DATABASE_URL:
         return {
             "check_same_thread": False,
-            "isolation_level": "SERIALIZABLE"
+            "isolation_level": "DEFERRED"
         }
     elif "postgresql" in settings.DATABASE_URL:
         return {

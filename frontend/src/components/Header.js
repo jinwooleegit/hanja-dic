@@ -16,6 +16,7 @@ import { alpha, styled, useTheme } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
 import MenuIcon from '@mui/icons-material/Menu';
 import TranslateIcon from '@mui/icons-material/Translate';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 
 // 검색 입력 컴포넌트 스타일링
 const Search = styled('div')(({ theme }) => ({
@@ -132,6 +133,10 @@ const Header = () => {
               <MenuItem onClick={() => { navigate('/'); handleMenuClose(); }}>
                 홈
               </MenuItem>
+              <MenuItem onClick={() => { navigate('/favorites'); handleMenuClose(); }}>
+                <FavoriteIcon fontSize="small" sx={{ mr: 1 }} />
+                즐겨찾기
+              </MenuItem>
               <MenuItem onClick={() => { navigate('/about'); handleMenuClose(); }}>
                 소개
               </MenuItem>
@@ -141,6 +146,14 @@ const Header = () => {
           <Box sx={{ display: 'flex' }}>
             <Button color="inherit" component={RouterLink} to="/">
               홈
+            </Button>
+            <Button 
+              color="inherit" 
+              component={RouterLink} 
+              to="/favorites"
+              startIcon={<FavoriteIcon />}
+            >
+              즐겨찾기
             </Button>
             <Button color="inherit" component={RouterLink} to="/about">
               소개

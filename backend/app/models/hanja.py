@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Index
+from sqlalchemy import Column, Integer, String, DateTime, Index, Text, Boolean
 from sqlalchemy.sql import func
 from app.db.base_class import Base
 
@@ -6,15 +6,17 @@ class Hanja(Base):
     __tablename__ = "hanja"
 
     id = Column(Integer, primary_key=True, index=True)
-    traditional = Column(String, unique=True, index=True, nullable=False)
-    simplified = Column(String, index=True)
-    korean_pronunciation = Column(String, index=True, nullable=False)
-    chinese_pronunciation = Column(String, index=True)
-    radical = Column(String, index=True)
+    traditional = Column(String(10), unique=True, index=True, nullable=False)
+    simplified = Column(String(10), index=True)
+    korean_pronunciation = Column(String(50), index=True, nullable=False)
+    chinese_pronunciation = Column(String(50), index=True)
+    japanese_pronunciation = Column(String(50), nullable=True)
+    radical = Column(String(10), index=True)
     stroke_count = Column(Integer, index=True)
-    meaning = Column(String, nullable=False)
-    examples = Column(String)
+    meaning = Column(Text, nullable=False)
+    examples = Column(Text, nullable=True)
     frequency = Column(Integer, default=0, index=True)
+    favorite = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

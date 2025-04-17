@@ -1,128 +1,216 @@
-from fastapi import APIRouter, Depends, HTTPException, Body, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Path, Query
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
-from app.db.session import get_db
-from app.models.hanja import Hanja
-from app.schemas.hanja import HanjaCreate, HanjaResponse, HanjaSearchRequest
-from app.core.cache import redis_cache
-from typing import List, Dict, Any, Optional
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 import logging
+from typing import List, Optional
 
+from app.api.deps import get_db
+from app.models.hanja import Hanja
+from app.schemas.hanja import HanjaCreate, HanjaResponse, HanjaSearchRequest, HanjaListResponse
+from app.core.cache import redis_cache as cache
+
+# 로거 설정
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/hanja")
 
-@router.post("/", response_model=HanjaResponse)
+# 라우터 초기화
+router = APIRouter(tags=["hanja"])
+
+@router.post("/", response_model=HanjaResponse, status_code=status.HTTP_201_CREATED)
 async def create_hanja(
     hanja_data: HanjaCreate,
     db: Session = Depends(get_db)
 ):
-    """한자 생성 API"""
+    """
+    한자 생성 또는 업데이트하는 엔드포인트
+    """
     try:
-        logger.debug(f"한자 생성 요청: {hanja_data.traditional}")
-        
-        # 기존 한자가 있는지 확인
+        # 이미 존재하는 한자인지 확인
         existing_hanja = db.query(Hanja).filter(Hanja.traditional == hanja_data.traditional).first()
         
         if existing_hanja:
-            logger.info(f"기존 한자 업데이트: {hanja_data.traditional}")
-            # 모델 필드 업데이트
-            for key, value in hanja_data.dict().items():
-                setattr(existing_hanja, key, value)
+            # 기존 한자 업데이트
+            for key, value in hanja_data.model_dump().items():
+                if value is not None:
+                    setattr(existing_hanja, key, value)
             db.commit()
-            db.refresh(existing_hanja)
-            return existing_hanja
+            return HanjaResponse.model_validate(existing_hanja)
         else:
-            logger.info(f"새 한자 생성: {hanja_data.traditional}")
             # 새 한자 생성
-            db_hanja = Hanja(**hanja_data.dict())
-            db.add(db_hanja)
+            new_hanja = Hanja(**hanja_data.model_dump())
+            db.add(new_hanja)
             db.commit()
-            db.refresh(db_hanja)
-            return db_hanja
+            db.refresh(new_hanja)
+            return HanjaResponse.model_validate(new_hanja)
+    
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"한자 생성 중 무결성 오류: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"한자 생성 실패: {str(e)}"
+        )
     except SQLAlchemyError as e:
-        logger.error(f"데이터베이스 오류: {str(e)}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"데이터베이스 오류: {str(e)}")
+        logger.error(f"한자 생성 중 데이터베이스 오류: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"한자 생성 중 데이터베이스 오류: {str(e)}"
+        )
     except Exception as e:
-        logger.error(f"한자 생성 중 오류: {str(e)}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"한자 생성 중 예기치 않은 오류: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"한자 생성 중 예기치 않은 오류: {str(e)}"
+        )
 
 @router.post("/search", response_model=List[HanjaResponse])
-async def search_hanja(
-    query: Dict[str, str] = Body(...), 
-    db: Session = Depends(get_db),
-    limit: int = Query(20, ge=1, le=100)
-):
-    """한자 검색 API"""
+async def search_hanja(search_request: HanjaSearchRequest, db: Session = Depends(get_db)):
+    """한자 검색"""
     try:
-        search_query = query.get("query", "")
-        logger.debug(f"한자 검색: {search_query}")
+        query = db.query(Hanja)
         
-        # 빈 쿼리는 빈 결과 반환
-        if not search_query:
-            return []
+        if search_request.query:
+            search_term = f"%{search_request.query}%"
+            query = query.filter(
+                (Hanja.traditional.contains(search_request.query)) |
+                (Hanja.simplified.contains(search_request.query)) |
+                (Hanja.korean_pronunciation.contains(search_request.query)) |
+                (Hanja.meaning.contains(search_request.query))
+            )
         
-        # 검색 쿼리 수행
-        results = db.query(Hanja).filter(
-            (Hanja.traditional.contains(search_query)) |
-            (Hanja.simplified.contains(search_query)) |
-            (Hanja.korean_pronunciation.contains(search_query)) |
-            (Hanja.chinese_pronunciation.contains(search_query))
-        ).order_by(Hanja.frequency.desc()).limit(limit).all()
+        # 정렬 기준 적용
+        if search_request.sort_by == "frequency":
+            query = query.order_by(Hanja.frequency.desc())
+        elif search_request.sort_by == "strokes":
+            query = query.order_by(Hanja.stroke_count.asc())
         
-        logger.info(f"검색 결과: {len(results)}개 항목 찾음")
+        results = query.limit(100).all()
         return results
-    except SQLAlchemyError as e:
-        logger.error(f"데이터베이스 오류: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"데이터베이스 오류: {str(e)}")
     except Exception as e:
-        logger.error(f"검색 중 오류: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"한자 검색 중 오류 발생: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"한자 검색 중 오류가 발생했습니다: {str(e)}")
 
 @router.get("/details/{hanja_char}", response_model=HanjaResponse)
-async def get_hanja_details(hanja_char: str, db: Session = Depends(get_db)):
-    """한자 상세 정보 조회 API"""
+async def get_hanja_details(
+    hanja_char: str = Path(..., description="상세 정보를 조회할 한자"),
+    db: Session = Depends(get_db)
+):
+    """
+    특정 한자의 세부 정보를 조회하는 엔드포인트
+    """
     try:
-        logger.debug(f"한자 상세 정보 조회: {hanja_char}")
+        # 캐시 확인
+        cache_key = f"hanja:{hanja_char}"
+        cached_data = await cache.get(cache_key)
         
-        if not hanja_char:
-            raise HTTPException(status_code=400, detail="한자가 제공되지 않았습니다")
-            
-        # 한자 조회
+        if cached_data:
+            return cached_data
+        
+        # 데이터베이스에서 한자 정보 조회
         hanja = db.query(Hanja).filter(Hanja.traditional == hanja_char).first()
         
         if not hanja:
-            logger.warning(f"한자를 찾을 수 없음: {hanja_char}")
-            raise HTTPException(status_code=404, detail="한자를 찾을 수 없습니다")
-            
-        logger.info(f"한자 상세 정보 조회 성공: {hanja_char}")
-        return hanja
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"한자 '{hanja_char}'를 찾을 수 없습니다"
+            )
+        
+        # 결과를 HanjaResponse로 변환
+        response = HanjaResponse.model_validate(hanja)
+        
+        # 캐시에 저장
+        await cache.set(cache_key, response.model_dump())
+        
+        return response
+    
     except HTTPException:
-        # 이미 생성된 HTTP 예외는 그대로 전달
+        raise
+    except Exception as e:
+        logger.error(f"한자 세부 정보 조회 중 오류: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"한자 세부 정보 조회 중 오류: {str(e)}"
+        )
+
+@router.post("/favorite/{hanja_char}", response_model=HanjaResponse)
+async def toggle_favorite(
+    hanja_char: str = Path(..., description="즐겨찾기 상태를 변경할 한자"),
+    db: Session = Depends(get_db)
+):
+    """한자 즐겨찾기 상태 토글 엔드포인트"""
+    try:
+        hanja = db.query(Hanja).filter(Hanja.traditional == hanja_char).first()
+        
+        if not hanja:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"해당 한자를 찾을 수 없습니다: {hanja_char}"
+            )
+        
+        # 즐겨찾기 상태 토글
+        hanja.favorite = not hanja.favorite
+        db.commit()
+        db.refresh(hanja)
+        
+        # 캐시 업데이트
+        await cache.delete(f"hanja:detail:{hanja_char}")
+        await cache.delete("hanja:favorites")
+        
+        return hanja
+    
+    except HTTPException:
         raise
     except SQLAlchemyError as e:
-        logger.error(f"데이터베이스 오류: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"데이터베이스 오류: {str(e)}")
+        db.rollback()
+        logger.error(f"즐겨찾기 토글 중 DB 오류: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"즐겨찾기 토글 중 DB 오류: {str(e)}"
+        )
     except Exception as e:
-        logger.error(f"한자 상세 정보 조회 중 오류: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"즐겨찾기 토글 중 오류: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"즐겨찾기 토글 중 오류: {str(e)}"
+        )
 
-@router.post("/clear-cache")
-async def clear_cache(pattern: str = Query("*")):
-    """캐시 초기화 API"""
+@router.get("/favorites", response_model=List[HanjaResponse])
+async def get_favorites(db: Session = Depends(get_db)):
+    """즐겨찾기한 한자 목록 조회 엔드포인트"""
     try:
-        logger.debug(f"캐시 초기화 요청: 패턴 '{pattern}'")
-        success = await redis_cache.clear_cache(pattern)
+        # 캐시 확인
+        cached_data = await cache.get("hanja:favorites")
+        if cached_data:
+            logger.info("캐시에서 즐겨찾기 목록 가져옴")
+            return cached_data
         
-        message = "캐시가 성공적으로 삭제되었습니다"
-        if not success:
-            logger.warning("캐시 삭제 실패")
-            message = "캐시 초기화 중 문제가 발생했습니다만, 서비스는 계속됩니다"
-            
-        logger.info("캐시 초기화 완료")
-        return {"message": message, "success": success}
+        # DB에서 조회
+        favorites = db.query(Hanja).filter(Hanja.favorite == True).all()
+        
+        # 캐시 저장
+        await cache.set("hanja:favorites", favorites)
+        
+        return favorites
+    
+    except Exception as e:
+        logger.error(f"즐겨찾기 목록 조회 중 오류: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"즐겨찾기 목록 조회 중 오류: {str(e)}"
+        )
+
+@router.post("/clear-cache", status_code=status.HTTP_200_OK)
+async def clear_cache():
+    """
+    캐시를 초기화하는 엔드포인트
+    """
+    try:
+        await cache.clear_cache("*")
+        return {"message": "캐시가 성공적으로 초기화되었습니다"}
     except Exception as e:
         logger.error(f"캐시 초기화 중 오류: {str(e)}")
-        # 캐시 실패가 전체 시스템에 영향을 주지 않도록 예외를 반환하지 않고 성공으로 처리
-        return {"message": "캐시가 성공적으로 삭제되었습니다", "success": True} 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"캐시 초기화 중 오류: {str(e)}"
+        ) 

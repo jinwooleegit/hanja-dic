@@ -172,4 +172,8 @@ class RedisCache:
             return False
 
 # 싱글톤 인스턴스 생성
-redis_cache = RedisCache() 
+redis_cache = RedisCache()
+
+def get_cache() -> RedisCache:
+    """Redis 캐시 인스턴스를 반환합니다."""
+    return redis_cache 
