@@ -4,7 +4,8 @@ import { ThemeProvider, createTheme } from '@mui/material';
 import CssBaseline from '@mui/material/CssBaseline';
 
 import MainPage from './pages/MainPage';
-import HanjaDetailPage from './pages/HanjaDetailPage';
+import SearchPage from './pages/SearchPage';
+import WordDetailPage from './pages/WordDetailPage';
 
 const theme = createTheme({
   palette: {
@@ -24,7 +25,8 @@ const App: React.FC = () => {
       <Router>
         <Routes>
           <Route path="/" element={<MainPage />} />
-          <Route path="/hanja/:character" element={<HanjaDetailPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/word/:id" element={<WordDetailPage />} />
         </Routes>
       </Router>
     </ThemeProvider>
