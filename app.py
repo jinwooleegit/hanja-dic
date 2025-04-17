@@ -22,7 +22,9 @@ words_data = load_words()
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', analytics_script='''
+        <script defer src="/_vercel/insights/script.js"></script>
+    ''')
 
 @app.route('/api/words/search')
 def search_words():
