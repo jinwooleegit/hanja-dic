@@ -5,53 +5,49 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 def check_xml_structure():
-    xml_file = Path('data/raw/1435291_5000.xml')
+    data_dir = Path('data/raw')
+    xml_files = list(data_dir.glob('*.xml'))
     
-    try:
-        tree = ET.parse(xml_file)
-        root = tree.getroot()
+    if not xml_files:
+        print("XML 파일을 찾을 수 없습니다.")
+        return
         
-        # 루트 태그 확인
-        print(f"\n루트 태그: {root.tag}")
-        
-        # 첫 번째 항목의 자세한 구조 확인
-        first_item = root.find('.//item')
-        if first_item is not None:
-            print("\n첫 번째 항목의 상세 구조:")
-            word_info = first_item.find('word_info')
-            if word_info is not None:
-                print("\nword_info 태그의 모든 자식 태그:")
-                for child in word_info:
-                    print(f"태그: {child.tag}")
-                    print(f"값: {child.text}")
-                    print("---")
+    print(f"\n총 XML 파일 수: {len(xml_files)}")
+    
+    for xml_file in xml_files:
+        try:
+            tree = ET.parse(xml_file)
+            root = tree.getroot()
+            
+            # 루트 태그 확인
+            print(f"\n파일: {xml_file.name}")
+            print(f"루트 태그: {root.tag}")
+            
+            # 전체 항목 수 확인
+            items = root.findall('.//item')
+            print(f"전체 항목 수: {len(items)}")
+            
+            # 첫 번째 항목의 자세한 구조 확인
+            if items:
+                first_item = items[0]
+                print("\n첫 번째 항목의 상세 구조:")
                 
-                # 의미 정보 확인
-                print("\n의미 정보 태그:")
-                sense_info = word_info.find('sense_info')
-                if sense_info is not None:
-                    for child in sense_info:
+                # target_code 확인
+                target_code = first_item.find('target_code')
+                if target_code is not None:
+                    print(f"대상 코드: {target_code.text}")
+                
+                # word_info 확인
+                word_info = first_item.find('word_info')
+                if word_info is not None:
+                    print("\nword_info 태그의 모든 자식 태그:")
+                    for child in word_info:
                         print(f"태그: {child.tag}")
                         print(f"값: {child.text}")
                         print("---")
             
-            # 단어 정보 요약
-            target_code = first_item.find('target_code').text if first_item.find('target_code') is not None else 'N/A'
-            word = word_info.find('word').text if word_info.find('word') is not None else 'N/A'
-            print(f"\n단어 정보 요약:")
-            print(f"대상 코드: {target_code}")
-            print(f"단어: {word}")
-        
-        # 전체 항목 수 확인
-        items = root.findall('.//item')
-        print(f"\n전체 항목 수: {len(items)}")
-        
-        # 실제 단어 수 확인
-        words = root.findall('.//word_info/word')
-        print(f"실제 단어 수: {len(words)}")
-        
-    except Exception as e:
-        print(f"오류 발생: {str(e)}")
+        except Exception as e:
+            print(f"{xml_file.name} 처리 중 오류 발생: {str(e)}")
 
 if __name__ == '__main__':
     check_xml_structure() 
